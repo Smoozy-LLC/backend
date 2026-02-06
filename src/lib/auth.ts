@@ -1,15 +1,17 @@
 import { SignJWT, jwtVerify } from "jose";
+import type { JWTPayload as JoseJWTPayload } from "jose";
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
 import { db } from "./db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret");
 
-export interface JWTPayload {
+// Our JWT payload extends jose JWTPayload (which includes an index signature).
+// This makes it compatible with SignJWT(payload).
+export type JWTPayload = JoseJWTPayload & {
   userId: string;
   email: string;
   isAdmin: boolean;
-}
+};
 
 export const hashPassword = async (password: string): Promise<string> => {
   return bcrypt.hash(password, 12);
