@@ -37,5 +37,86 @@ model User {
   updatedAt     DateTime   @updatedAt
   lastLoginAt   DateTime?
   
+  // Relations
+  authLogs        AuthLog[]
+  errorLogs       ErrorLog[]
+  providerUsages  ProviderUsage[]
+  activeSessions  ActiveSession[]
+  
   @@map("users")
+}
+
+// ── Auth logs ─────────────────────────────────────────────
+
+model AuthLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String   // email даже для неудачных попыток
+  action    String   // "login_ok" | "login_fail" | "register" | "token_refresh"
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@map("auth_logs")
+}
+
+// ── Error logs ────────────────────────────────────────────
+
+model ErrorLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String   // "stt_token_fail" | "ai_request_fail" | "provider_error" | "system"
+  provider  String?  // "speechmatics" | "elevenlabs" | "openrouter"
+  message   String
+  metadata  String?  // JSON с доп. данными
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([type])
+  @@map("error_logs")
+}
+
+// ── Provider usage / costs ────────────────────────────────
+
+model ProviderUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  String   // "speechmatics" | "elevenlabs" | "openrouter"
+  type      String   // "stt" | "ai_chat"
+  units     Float    // минуты (STT) или токены/1000 (AI)
+  costUsd   Float    @default(0) // расчётная стоимость
+  metadata  String?  // JSON (model, language, etc.)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([provider])
+  @@map("provider_usages")
+}
+
+// ── Active sessions ───────────────────────────────────────
+
+model ActiveSession {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "stt" | "ai_chat"
+  provider  String   // "speechmatics" | "elevenlabs" | "openrouter"
+  startedAt DateTime @default(now())
+  lastSeenAt DateTime @default(now()) // heartbeat
+  endedAt   DateTime?
+  metadata  String?  // JSON
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([endedAt])
+  @@map("active_sessions")
 }

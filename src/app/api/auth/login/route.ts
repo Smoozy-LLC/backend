@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { verifyPassword, createToken } from "@/lib/auth";
+import { logAuth, getRequestIp, getRequestUserAgent } from "@/lib/loggers";
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
+    const ip = getRequestIp(request);
+    const userAgent = getRequestUserAgent(request);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -19,6 +22,7 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
+      logAuth({ email, action: "login_fail", ip, userAgent });
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -28,6 +32,7 @@ export async function POST(request: Request) {
     // Verify password
     const isValid = await verifyPassword(password, user.password);
     if (!isValid) {
+      logAuth({ userId: user.id, email, action: "login_fail", ip, userAgent });
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -39,6 +44,9 @@ export async function POST(request: Request) {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+
+    // Log successful login
+    logAuth({ userId: user.id, email: user.email, action: "login_ok", ip, userAgent });
 
     // Create JWT token
     const token = await createToken({

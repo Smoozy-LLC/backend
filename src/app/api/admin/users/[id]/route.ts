@@ -64,7 +64,9 @@ export async function PATCH(request: Request, { params }: Params) {
       "isDeveloper",
       "isAdmin",
       "sttMinutesLimit",
+      "sttMinutesUsed",
       "aiCreditsLimit",
+      "aiCreditsUsed",
     ];
 
     const updateData: Record<string, unknown> = {};

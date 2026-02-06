@@ -1,5 +1,6 @@
 import { requireActiveUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { logError, logProviderUsage } from "@/lib/loggers";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "mistralai/ministral-8b-2512";
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
     if (!orResponse.ok) {
       const errorText = await orResponse.text().catch(() => "");
       console.error("[AI] OpenRouter error:", orResponse.status, errorText);
+      logError({ userId: user.id, type: "ai_request_fail", provider: "openrouter", message: `HTTP ${orResponse.status}: ${errorText.slice(0, 200)}` });
       return new Response(
         JSON.stringify({ error: `AI provider error: ${orResponse.status}` }),
         { status: 502, headers: { "Content-Type": "application/json" } }
@@ -160,13 +162,21 @@ export async function POST(request: Request) {
           // Update usage in DB (best-effort, don't block response)
           try {
             const estimatedTokens = totalResponseTokens || 500;
-            // Rough cost estimate: $0.0001 per token (very approximate)
-            const costEstimate = estimatedTokens * 0.0000001;
+            // Rough cost estimate: $0.0001 per 1k tokens (very approximate)
+            const costEstimate = (estimatedTokens / 1000) * 0.001;
             await db.user.update({
               where: { id: user.id },
               data: {
                 aiCreditsUsed: { increment: costEstimate },
               },
+            });
+            logProviderUsage({
+              userId: user.id,
+              provider: "openrouter",
+              type: "ai_chat",
+              units: estimatedTokens / 1000, // in thousands
+              costUsd: costEstimate,
+              metadata: { model: OPENROUTER_MODEL },
             });
           } catch (e) {
             console.error("[AI] Failed to update usage:", e);
