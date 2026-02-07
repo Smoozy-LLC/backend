@@ -4,6 +4,8 @@ interface TempKeyResponse {
   key_value: string;
 }
 
+type SpeechmaticsRegion = "eu" | "us";
+
 /**
  * Generate a temporary JWT for Speechmatics real-time WebSocket connection.
  * Uses the master API key to create a short-lived token (TTL seconds).
@@ -13,7 +15,7 @@ interface TempKeyResponse {
  * @param ttl - Token time-to-live in seconds (default: 120)
  */
 export const generateSpeechmaticsToken = async (
-  region: string = "eu",
+  region: SpeechmaticsRegion = "eu",
   ttl: number = 120
 ): Promise<string> => {
   if (!SPEECHMATICS_API_KEY) {
@@ -28,7 +30,8 @@ export const generateSpeechmaticsToken = async (
         "Content-Type": "application/json",
         Authorization: `Bearer ${SPEECHMATICS_API_KEY}`,
       },
-      body: JSON.stringify({ ttl }),
+      // IMPORTANT: region must match WS host (eu.rt... vs us.rt...)
+      body: JSON.stringify({ ttl, region }),
     }
   );
 
